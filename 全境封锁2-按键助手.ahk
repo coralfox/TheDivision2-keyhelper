@@ -1,48 +1,57 @@
-﻿;#####################
-;#=====命令====#
+﻿;#=====命令====#
 ;#####################
-SetWorkingDir %A_ScriptDir%
 #NoEnv
+;#MenuMaskKey vkE8
 #InstallKeybdHook
 #InstallMouseHook
-#KeyHistory 0
+#KeyHistory 100
 #UseHook
 #MaxThreadsPerHotkey 1
 #MaxThreads 30
 #MaxThreadsBuffer off
-SendMode Input
+; SendMode InputThenPlay
 ListLines , Off
-PID := DllCall("GetCurrentProcessId")
-Process , Priority, %PID%, High
+CurPID := DllCall("GetCurrentProcessId")
+Process , Priority, %CurPID%, High
 CoordMode , Pixel, Screen
 CoordMode , Mouse, Screen
+SetWorkingDir %A_ScriptDir%
 
+SetMouseDelay, 0,30, Play
+SetKeyDelay, 0, 60, Play
 ;#####################
 ;#====读取ini&初始化====#
 ;#####################
 global _downVal := 2
-global _rightVal := 0
+global _RightVal := 0
 global _shotdelay := 0
 
+Global vCloseEAC:=1
+Global vSetUPC:=1
+
+IniRead , vOnekeyRun, TheDivision2.ini, 游戏启动, 一键启动, 1
+IniRead , vCloseEAC, TheDivision2.ini, 游戏启动, 关闭EAC, 1
+IniRead , vSetUPC, TheDivision2.ini, 游戏启动, 降低UPC, 1
+
+IniRead , vOneKeyZL, TheDivision2.ini, 一键政令, 启用, 1
+IniRead , resetArea, TheDivision2.ini, 一键政令, 重置控制点, 1
+
+IniRead , vAutoBox, TheDivision2.ini, 服装箱子, 启用, 0
+
 IniRead , _downVal, TheDivision2.ini, 高级模式, 垂直偏移, 2
-IniRead , _rightVal, TheDivision2.ini, 高级模式, 水平偏移, 0
+IniRead , _RightVal, TheDivision2.ini, 高级模式, 水平偏移, 0
 IniRead , _shotdelay, TheDivision2.ini, 高级模式, 单发间隔, 0
 
 IniRead , speedIndex, TheDivision2.ini, 简单模式, 单发间隔, 1
 
 IniRead , _autofire, TheDivision2.ini, 自动射击, 启用, 0
 IniRead , vFastShoot, TheDivision2.ini, 自动射击, 简单模式, 1
-IniRead , vDiyShoot, TheDivision2.ini, 自动射击, 高级模式, vFastShoot
+IniRead , vDiyShoot, TheDivision2.ini, 自动射击, 高级模式, 0
 
 IniRead , vAutoLiu, TheDivision2.ini, 无限溜溜球, 启用, 0
 IniRead , vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式, 1	;1-装配工,2固线
 IniRead , vgxLiu, TheDivision2.ini, 无限溜溜球, 固线模式, 0
 IniRead , vAutoGxLiu, TheDivision2.ini, 无限溜溜球,技能使用后自动重置固线, 0	;1-装配工,2固线
-
-IniRead , vAutoBox, TheDivision2.ini, 服装箱子, 启用, 0
-
-IniRead , vOneKeyZL, TheDivision2.ini, 一键政令, 启用, 1
-IniRead , resetArea, TheDivision2.ini, 一键政令, 重置控制点, 1
 
 ;#####################
 ;#====初始化====#
@@ -54,7 +63,7 @@ IniRead , resetArea, TheDivision2.ini, 一键政令, 重置控制点, 1
 ; global _rightVal = 0
 global _rampdown = 1
 ; global _shotdelay=0
-global _readytofire = 1	;射击等待
+global _Readytofire = 1	;射击等待
 global _timerRunning = 0
 global crosshairX =
 global crosshairY =
@@ -72,20 +81,37 @@ global keyName := "LButton"
 ; global vAutoFireSwitch :=0
 
 ;服装箱子
-; global skinBoxEnable := 0
+global skinBoxEnable := 0
 ; global vAutoBox :=0
 ;常规指令
-global ver := "1.5"
+global ver := "2.0"
 global voiceObject := ComObjCreate("SAPI.SpVoice")
 ;voiceObject.Rate := 4
 voiceObject.Volume := 100
 ; global resetArea :=1
 ; global vOneKeyZL :=1
-
+global vStartTime:=0
+global vEndTime:=0
 ;#####################
 ;#====菜单相关====#
 ;#####################
 Menu , tray, NoStandard
+
+Menu , tray, add, 一键启动|Ctrl+F10, OnekeyRun
+if (vOnekeyRun) {
+    Menu , tray, check, 一键启动|Ctrl+F10
+}
+
+Menu , tray, add, 游戏启动后关闭小蓝熊, CloseEAC
+if (vCloseEAC) {
+    Menu , tray, check, 游戏启动后关闭小蓝熊
+}
+Menu , tray, add, 游戏启动后降低UPC优先级, SetUPC
+if (vSetUPC) {
+    Menu , tray, check, 游戏启动后降低UPC优先级
+}
+
+Menu , tray, add,
 Menu , tray, add, 一键政令|ALT+1, OnekeyZL
 if (vOneKeyZL) {
     Menu , tray, check, 一键政令|ALT+1
@@ -102,22 +128,22 @@ Menu , tray, add, 自动开服装箱|ALT+2, AutoBox
 if (vAutoBox) {
     Menu , tray, check, 自动开服装箱|ALT+2
 }
-Menu , tray, add, 大小写切换键停止开箱, MenuHandler
-Menu , tray, Disable, 大小写切换键停止开箱
+Menu , tray, add,再次按下ALT+2停止开箱, MenuHandler
+Menu , tray, Disable, 再次按下ALT+2停止开箱
 
 ;连射
 Menu , tray, add,
 ; Menu, tray, add,自动连射,MenuHandler
 ; fn := Func("AutoFireSwitch")
 Menu , Tray, Add, 自动连射|F4开关, AutoFireSwitch
-Menu , MySubmenu1, Add, 简单模式, FastShoot
-Menu , MySubmenu1, Add, 高级模式, DiyShoot
+Menu , MySubMenu1, Add, 简单模式, FastShoot
+Menu , MySubMenu1, Add, 高级模式, DiyShoot
 if (vFastShoot) {
-    Menu , MySubmenu1, check, 简单模式
+    Menu , MySubMenu1, check, 简单模式
 } else {
-    Menu , MySubmenu1, check, 高级模式
+    Menu , MySubMenu1, check, 高级模式
 }
-Menu , Tray, Add, 连射模式, :MySubmenu1
+Menu , Tray, Add, 连射模式, :MySubMenu1
 if (_autofire) {
     Menu , tray, check, 自动连射|F4开关
 }
@@ -131,14 +157,14 @@ Menu , tray, Disable, 武器发射设置额外按键为J
 ;溜溜球
 Menu,tray,add,
 Menu,Tray,Add,无限溜溜球|F5开关,AutoLiu
-Menu,MySubmenu2,Add,装配工模式,zpgLiu
-Menu,MySubmenu2,Add,固线模式,gxLiu
+Menu,MySubMenu2,Add,装配工模式,zpgLiu
+Menu,MySubMenu2,Add,固线模式,gxLiu
 if (vzpgLiu) {
-    Menu , MySubmenu2, check, 装配工模式
+    Menu , MySubMenu2, check, 装配工模式
 } else {
-    Menu , MySubmenu2, check, 固线模式
+    Menu , MySubMenu2, check, 固线模式
 }
-Menu,Tray,Add,溜溜球模式,:MySubmenu2
+Menu,Tray,Add,溜溜球模式,:MySubMenu2
 Menu,Tray,Add,固线自动重置,AutoGxLiu
 if (vzpgLiu) {
     Menu,Tray,Disable,固线自动重置
@@ -155,9 +181,12 @@ else{
 
 if (vAutoLiu) {
     Menu , tray, check, 无限溜溜球|F5开关
+    Menu , tray, enable, 溜溜球模式
 }
-Else{
+else{
+    Menu , tray, uncheck, 无限溜溜球|F5开关
     Menu , tray, Disable, 溜溜球模式
+    Menu,Tray,Disable,固线自动重置
 }
 Menu , tray, add,使用鼠标侧键1刷新技能 , MenuHandler
 Menu , tray, Disable, 使用鼠标侧键1刷新技能
@@ -170,74 +199,203 @@ Menu,tray,add,暂停 | Pause,PauseScript
 Menu,tray,add,
 Menu,tray,add,更新 | Ver %ver%,Version	;使用资源表示符 207 表示的图标
 Menu,tray,add,退出 | Exit,ExitScript
-menu,tray,tip,杀戮小队QQ群专享版
+Menu,tray,tip,杀戮小队QQ群专享版
 
 ;#####################
 ;#====脚本====#
 ;#####################
 
-; #IfWinActive ahk_exe TheDivision2.exe
-; 切换速率，默认是鼠标侧键
-#IF WinActive("ahk_exe TheDivision2.exe") AND vFastShoot and _autofire
-    ~o::
-    speedIndex += 1
-    if (speedIndex > speedArray.Length()) {
-        speedIndex := 0
+#If WinExist("ahk_exe TheDivision2.exe") AND vOnekeyRun
+    !F10::
+
+    WinGet, NewPID, PID, ahk_exe TheDivision2.exe
+    if NewPID
+        Process,close,%NewPID%
+    Sleep 1000
+
+    WinGet, NewPID, PID, ahk_exe EasyAntiCheat.exe
+    if NewPID
+        Process,close,%NewPID%
+    Sleep 1000
+
+    WinGet, NewPID, PID, ahk_exe upc.exe
+    if NewPID
+        Process,close,%NewPID%
+    Sleep 1000
+return
+
+#If vOnekeyRun
+^F10::
+WinGet, NewPID, PID, ahk_exe TheDivision2.exe
+if not NewPID
+{Run,uplay://launch/4932/0
+    Speak("叛变特工已上线")
+
+    if(vCloseEAC or vSetUPC)
+    {
+        vStartTime:=A_Now
+        SetTimer,timeCS,1000
     }
-    Speak(speedIndex > 0 ? "连击间隔 " speedArray[speedIndex] : "已关闭连击")
+}
+else if (vCloseEAC or vSetUPC)
+{
+    CloseAndSet()
+}
+return
 
-    iniwrite, %speedIndex%, TheDivision2.ini, 简单模式, 单发间隔
+timeCS:
+    vEndTime:=A_Now
+    EnvSub, vEndTime, vStartTime, Minutes
+    ; ShowToolTip(vEndTime)
+    if(vEndTime>=4)
+    {
+        CloseAndSet()
+        SetTimer,timeCS,Delete
+    }
+return
 
+CloseAndSet(){
+
+    cmdInfo := cmdClipReturn("taskkill /f /im EasyAntiCheat.exe /t")
+    ; cmdInfo := cmdClipReturn("taskkill /f /im notepad++.exe /t")
+
+    ; msgbox % SubStr(cmdInfo,1,2)
+    if cmdInfo and vCloseEAC
+    {
+        Speak(SubStr(cmdInfo,1,2)="成功" ? "已经关闭小蓝熊":"未能关闭小蓝熊")
+    }
+
+    if vSetUPC and WinExist("ahk_exe upc.exe")
+    {
+        WinGet, NewPID, PID, ahk_exe upc.exe
+        Process, Priority, %NewPID%, Low
+        ;Process, Priority,"upc.exe",Low
+        Sleep 3000
+
+        Speak(ErrorLevel ? "成功设置UPC优先级为低":"UPC优先级设置失败")
+    }
+}
+cmdClipReturn(command){
+    cmdInfo:=""
+    Clip_Saved:=ClipboardAll
+    try{
+        Clipboard:=""
+        Run,% ComSpec " /C " command " | CLIP", , Hide
+        ClipWait,2
+        cmdInfo:=Clipboard
+    }catch{}
+    Clipboard:=Clip_Saved
+return cmdInfo
+}
+
+; 打开或关闭 5 政令，默认是 Alt+1
+#If WinActive("ahk_exe TheDivision2.exe") AND vOneKeyZL
+!1::
+vDelay:=150
+SendPlay {m}
+Sleep %vDelay%
+SendPlay {z}
+Sleep %vDelay%
+SendPlay {Down}
+Sleep %vDelay%
+SendPlay {Space}
+Sleep %vDelay%
+
+loop, 4
+{
+    SendPlay {Space}
+    Sleep %vDelay%
+    SendPlay {Down}
+    Sleep %vDelay%
+}
+
+SendPlay {Space}
+Sleep %vDelay%
+SendPlay {Esc}
+Sleep %vDelay%
+;根据选项决定是否重置控制点
+if (resetArea = 1)
+{
+    SendPlay {Down}
+    Sleep %vDelay%
+    SendPlay {Space}
+    Sleep %vDelay%
+}
+SendPlay {f}
+Sleep 300
+SendPlay {Space}
+Sleep %vDelay%
+SendPlay {m}
+return
+
+; 启动自动打开服装箱，默认是 Alt+2
+#If WinActive("ahk_exe TheDivision2.exe") AND vAutoBox
+    !2::
+    skinBoxEnable := !skinBoxEnable
+
+    if(skinBoxEnable)
+    {
+        Speak("启动自动打开服装箱")
+        SetTimer, openBOX, 9000
+    }
+    else{
+        SetTimer, openBOX, delete
+        Speak("已停止打开服装箱")
+    }
+return
+
+openBOX:
+    SendKey("x", 2500)
+    Sleep 5000
+    SendKey("Space")
+    Sleep 1000
 return
 
 ; 按住鼠标右键再按左键连击，其他情况不连击
 #If speedIndex > 0 AND _autofire AND vFastShoot and WinActive("ahk_exe TheDivision2.exe")
-    ~RButton & LButton::fastFire(speedIndex)
 
 #If WinActive("ahk_exe TheDivision2.exe") and vAutoLiu AND vzpgLiu
-XButton1::
-SendInput {q Down}
-Sleep 500
-SendInput {q Up}
-;   SendKey("q",1000)
-Sleep 100
-Loop , 6 {
-    SendKey("5")
-    Sleep 100
+XButton1 UP::
+SendPlay {q Down}
+sleep 800
+loop,20{
+    SendPlay {5}
+    sleep 50
 }
-Return
+sleep 1500
+SendPlay {q Up}
+return
 
 #If WinActive("ahk_exe TheDivision2.exe") and vAutoLiu AND vgxLiu
     XButton1::
-    SendKey("b")
-    Sleep 120
+    vdelay:=85
+    SendPlay {b}
+    Sleep vdelay
+    SendPlay {Down}
+    Sleep vdelay
+    SendPlay {Down}
+    Sleep vdelay
+    SendPlay {Space}
+    Sleep vdelay
+    SendPlay {Down}
+    Sleep vdelay
+    SendPlay {Space}
+    Sleep vdelay
+    SendPlay {UP}
+    Sleep vdelay
+    SendPlay {Space}
+    Sleep vdelay
+    SendPlay {Esc}
+    Sleep vdelay
+    SendPlay {b}
+    Sleep vdelay
+return
 
-    SendKey("Down")
-    Sleep 1000
-    SendKey("Down")
-    Sleep 1000
-
-    SendKey("Space")
-    Sleep 1000
-
-    SendKey("Down")
-    Sleep 1000
-    SendKey("Space")
-    Sleep 1000
-
-    SendKey("UP")
-    Sleep 1000
-    SendKey("Space")
-    Sleep 1000
-    SendKey("b")
-    Sleep 1000
-Return
-
-; #InputLevel 1
+#InputLevel 1
 #If WinActive("ahk_exe TheDivision2.exe") and vAutoLiu AND vgxLiu and vAutoGxLiu
-~Q UP::
-~LButton UP::
-~E UP::
+~Q::
+~E::
+~LButton::
     if (A_ThisHotkey = "~LButton" and A_PriorHotkey = "~Q" and A_TimeSincePriorHotkey <= 1500 ;Q然后左键释放
         or A_ThisHotkey="~Q" and A_PriorHotkey = "~Q" and A_TimeSincePriorHotkey <= 600 ;双击Q释放
     or A_ThisHotkey="~Q" and A_TimeSinceThisHotkey >= 400 ;长按Q释放
@@ -245,103 +403,45 @@ Return
     or A_ThisHotkey="~E" and A_PriorHotkey = "~E" and A_TimeSincePriorHotkey <= 600 ;双击E释放
     or A_ThisHotkey="~E" and A_TimeSinceThisHotkey >= 400 )
     {
-        ; Sleep 1000
-        ; send,{XButton1}
+        Sleep 1500
+        send,{XButton1}
     }
 
 return
-; #InputLevel 0
+#InputLevel 0
 
-; 打开或关闭 5 政令，默认是 Alt+1
-#If WinActive("ahk_exe TheDivision2.exe") AND vOneKeyZL
-!1::
-send {m}
-Sleep 600
-send {z}
-Sleep 400
-SendKey("Down")
-Sleep 200
-SendKey("Space")
-Sleep 300
-
-Loop, 4
-{
-    SendKey("Space")
-    Sleep 100
-    SendKey("Down")
-    Sleep 100
-}
-
-SendKey("Space")
-Sleep 300
-SendKey("Esc")
-Sleep 300
-;根据选项决定是否重置控制点
-if (resetArea = 1)
-{
-    SendKey("Down")
-    Sleep 200
-    SendKey("Space")
-    Sleep 200
-}
-SendKey("f")
-Sleep 200
-SendKey("Space")
-Sleep 200
-SendKey("Esc")
-return
-
-; 启动自动打开服装箱，默认是 Alt+2
-#If WinActive("ahk_exe TheDivision2.exe") AND vAutoBox
-    !2::
-    ; skinBoxEnable := 1
-
-    Speak("启动自动打开服装箱")
-
-    while (vAutoBox)
-    {
-        SendKey("x", 2500)
-        Sleep 5000
-        SendKey("Space")
-        Sleep 1000
-    }
-
-return
-
-; 停止自动打开服装箱，默认是 大小写切换键
-CapsLock::
-    if (vAutoBox)
-    {
-        vAutoBox := 0
-        Speak("已停止自动打开服装箱")
-    }
-
-return
-#If
-    ; ~F3:: ; 自动
-;         _enabled := ! _enabled
-;         _autofire = 0
-;         ToolTip("Script Enabled= "_enabled)
-; return
-
-#IF WinActive("ahk_exe TheDivision2.exe")
+#If WinActive("ahk_exe TheDivision2.exe")
 ~F4::	;Change triggerbot to singleshot OR enable autofire if you also turn up duration with o / ctrl-o 将触发器改为单发，或启用自动射击，如果你也用O/ctrl-o调高持续时间的话。
 ; _autofire := ! _autofire
-Gosub,AutoFireSwitch
+gosub,AutoFireSwitch
 ; ToolTip("Autofire= "_autofire)
 return
 
-#IF WinActive("ahk_exe TheDivision2.exe")
-    ~F5::	
-    Gosub,AutoLiu
+~F5::
+    gosub,AutoLiu
 return
+#If
 
-~NumpadAdd::	; Adds compensation.
+; #IfWinActive ahk_exe TheDivision2.exe
+; 切换速率，默认是鼠标侧键
+#If WinActive("ahk_exe TheDivision2.exe") AND vFastShoot and _autofire
+~o::
+speedIndex += 1
+if (speedIndex > speedArray.Length()) {
+    speedIndex := 0
+}
+Speak(speedIndex > 0 ? "连击间隔 " speedArray[speedIndex] : "已关闭连击")
+IniWrite, %speedIndex%, TheDivision2.ini, 简单模式, 单发间隔
+return
+#If
+
+#If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire
+    ~NumpadAdd::	; Adds compensation.
     _downVal := _downVal + 1
     ; ToolTip("向下补偿= " . _downVal)
     Speak("垂直偏移补偿为" _downVal)
 
-    iniwrite, % _downVal, TheDivision2.ini, 高级模式, 垂直偏移
+    IniWrite, % _downVal, TheDivision2.ini, 高级模式, 垂直偏移
 return
 
 ~NumpadSub::	; Substracts compensation.
@@ -351,25 +451,25 @@ return
         ; ToolTip("向下补偿= " . _downVal)
         Speak("垂直偏移补偿为" _downVal)
 
-        iniwrite , % _downVal, TheDivision2.ini, 高级模式, 垂直偏移
+        IniWrite , % _downVal, TheDivision2.ini, 高级模式, 垂直偏移
     }
 
 return
 
 ~^NumpadAdd::	; Adds right adjust
-    _rightVal := _rightVal + 1
+    _RightVal := _RightVal + 1
     ; ToolTip("Right(+)/Left(-)= " . _rightVal)
-    Speak("水平偏移补偿为" _rightVal)
+    Speak("水平偏移补偿为" _RightVal)
 
-    iniwrite, % _rightVal, TheDivision2.ini, 高级模式, 水平偏移
+    IniWrite, % _RightVal, TheDivision2.ini, 高级模式, 水平偏移
 return
 
 ~^NumpadSub::	; Adds left adjust
-    _rightVal := _rightVal - 1
+    _RightVal := _RightVal - 1
     ; ToolTip("Right(+)/Left(-)= " . _rightVal)
-    Speak("水平偏移补偿为" _rightVal)
+    Speak("水平偏移补偿为" _RightVal)
 
-    iniwrite, % _rightVal, TheDivision2.ini, 高级模式, 水平偏移
+    IniWrite, % _RightVal, TheDivision2.ini, 高级模式, 水平偏移
 return
 
 ~o::	; Single shot timer up (zero is always fire)
@@ -377,48 +477,38 @@ return
     ; ToolTip("Single Shot Delay up= " _shotdelay)
     Speak("单发射击延迟为" _shotdelay)
 
-    iniwrite, % _shotdelay, TheDivision2.ini, 高级模式, 单发间隔
-Return
-
-~^o::	; Single shot timer down (zero is always fire)
-    if _shotdelay > 0
-    {
-        _shotdelay := _shotdelay - 25
-        ; ToolTip("Single Shot Delay down= " _shotdelay)
-        Speak("单发射击延迟为" _shotdelay)
-
-        iniwrite , % _shotdelay, TheDivision2.ini, 高级模式, 单发间隔
-    }
+    IniWrite, % _shotdelay, TheDivision2.ini, 高级模式, 单发间隔
 return
 
-#IF WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire
+#If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire
     ~LButton:: lessrecoil()
 ~RButton:: lessrecoil_triggerbot()	;"RButton" is mouse 2.  If you change this, make sure you replace every RButton in the script.
-~Joy10:: lessrecoil_triggerbot_xbox()
+;~Joy10:: lessrecoil_triggerbot_xbox()
 
-~RButton UP::
+~RButton Up::
     loop,4{
-        sleep 200
+        Sleep 200
         Send , { j up}
     }
 RETURN
-;####################
+#If
+    ;####################
 ;======Functions======
 ;####################
 lessrecoil()
 {
-    While GetKeyState("LButton", "P")
+    while GetKeyState("LButton", "P")
     {
-        sleep 10
+        Sleep 10
         ApplyReduction()
-        sleep 10
+        Sleep 10
     }
 return
 }
 ;==================
 lessrecoil_triggerbot()
 {
-    While GetKeyState("RButton", "P")
+    while GetKeyState("RButton", "P")
     {
 
         if CrosshairCheck()
@@ -428,16 +518,16 @@ lessrecoil_triggerbot()
         }
 
     }
-    Send , { j up }
+    SendInput , { j up }
     Sleep3(10)
     _timerRunning = 0
-    _readytofire = 1
+    _Readytofire = 1
 return
 }
 ;==================
 lessrecoil_triggerbot_xbox()
 {
-    While GetKeyState("Joy10")
+    while GetKeyState("Joy10")
     {
 
         if CrosshairCheck()
@@ -450,14 +540,14 @@ lessrecoil_triggerbot_xbox()
     Send , { j up }
     Sleep3(5)
     _timerRunning = 0
-    _readytofire = 1
+    _Readytofire = 1
 return
 }
 ;==================
 ApplyReduction()
 {
 
-    DllCall("mouse_event", uint, 1, int, _rightVal, int, _downVal, uint, 0, int, 0)
+    DllCall("Mouse_event", uint, 1, int, _RightVal, int, _downVal, uint, 0, int, 0)
     Sleep 20
     ; DllCall("mouse_event",uint,1,int,_rightVal,int,_downVal,uint,0,int,0)
     ; Sleep 20
@@ -494,16 +584,16 @@ TryToFire()
 {
     if _shotdelay = 0
     {
-        Send , { j down }
+        SendInput , { j down }
         return
     } else
     {
-        if _readytofire = 1
+        if _Readytofire = 1
         {
-            Send , { j up }
-            sleep 10
-            Send , { j down }
-            _readytofire = 0
+            SendInput , { j up }
+            Sleep 10
+            SendInput , { j down }
+            _Readytofire = 0
             ShotTimer()
             return
         } else
@@ -515,12 +605,12 @@ TryToFire()
         ShotTimer()
         if _shotdelay > 0
         {
-            Send , { j up }
+            SendInput , { j up }
             ShotTimer()
-            sleep 10
+            Sleep 10
         } else
         {
-            _readytofire = 1
+            _Readytofire = 1
         }
     }
 }
@@ -538,52 +628,76 @@ return
 ShotWait:
     SetTimer, ShotWait, Off
     _timerRunning = 0
-    _readytofire = 1
+    _Readytofire = 1
 return
 }
-;==================
+;#####################
+;#====游戏启动相关菜单====#
+;#####################
+OnekeyRun:
+    Menu, Tray, ToggleCheck, 一键启动|Ctrl+F10
+    vOnekeyRun := Not vOnekeyRun
+    IniWrite, % vOnekeyRun, TheDivision2.ini, 游戏启动, 一键启动
+return
 
+CloseEAC:
+    Menu, Tray, ToggleCheck, 游戏启动后关闭小蓝熊
+    vCloseEAC := Not vCloseEAC
+    IniWrite, % vCloseEAC, TheDivision2.ini, 游戏启动, 关闭EAC
+return
+
+SetUPC:
+    Menu, Tray, ToggleCheck, 游戏启动后降低UPC优先级
+    vSetUPC := Not vSetUPC
+    IniWrite, % vSetUPC, TheDivision2.ini, 游戏启动, 降低UPC
+return
+
+;#####################
+;#====一键政令相关菜单====#
+;#####################
 ;一键政令
 OnekeyZL:
     Menu, Tray, ToggleCheck, 一键政令|ALT+1
     vOneKeyZL := Not vOneKeyZL
-    iniwrite, % vOneKeyZL, TheDivision2.ini, 一键政令, 启用
+    IniWrite, % vOneKeyZL, TheDivision2.ini, 一键政令, 启用
 return
 
 ;重置控制点
 ResetControlArea:
     Menu, Tray, ToggleCheck, 一键政令时重置控制点
     resetArea := Not resetArea
-    iniwrite, % resetArea, TheDivision2.ini, 一键政令, 重置控制点
+    IniWrite, % resetArea, TheDivision2.ini, 一键政令, 重置控制点
 return
 
 ;自动开服装箱
 AutoBox:
     Menu, Tray, ToggleCheck, 自动开服装箱|ALT+2
     vAutoBox := Not vAutoBox
-    iniwrite, % vAutoBox, TheDivision2.ini, 服装箱子, 启用
+    IniWrite, % vAutoBox, TheDivision2.ini, 服装箱子, 启用
 
 return
-
+;#####################
+;#====自动射击相关菜单====#
+;#####################
 ;左键简单模式
 FastShoot:
-    Menu, MySubmenu1, Check, 简单模式
-    Menu, MySubmenu1, UnCheck, 高级模式
+    Menu, MySubMenu1, Check, 简单模式
+    Menu, MySubMenu1, UnCheck, 高级模式
     vFastShoot := 1
     vDiyShoot := 0
-    iniwrite, % vFastShoot, TheDivision2.ini, 自动射击, 简单模式
-    iniwrite, % vDiyShoot, TheDivision2.ini, 自动射击, 高级模式
+    IniWrite, % vFastShoot, TheDivision2.ini, 自动射击, 简单模式
+    IniWrite, % vDiyShoot, TheDivision2.ini, 自动射击, 高级模式
 return
 
 ;左键高级模式
 DiyShoot:
-    Menu, MySubmenu1, Check, 高级模式 
-    Menu, MySubmenu1, UnCheck, 简单模式
+    Menu, MySubMenu1, Check, 高级模式
+    Menu, MySubMenu1, UnCheck, 简单模式
     vDiyShoot := 1
     vFastShoot := 0
 
-    iniwrite, % vFastShoot, TheDivision2.ini, 自动射击, 简单模式
-    iniwrite, % vDiyShoot, TheDivision2.ini, 自动射击, 高级模式
+    IniWrite, % vFastShoot, TheDivision2.ini, 自动射击, 简单模式
+    IniWrite, % vDiyShoot, TheDivision2.ini, 自动射击, 高级模式
 return
 
 ;自动连射开关
@@ -599,57 +713,65 @@ fireMode := vFastShoot ? "简单模式" : "高级模式"
     else{
         Menu , tray, Disable, 连射模式
     }
-    iniwrite, % _autofire, TheDivision2.ini, 自动射击, 启用
-Return
+    IniWrite, % _autofire, TheDivision2.ini, 自动射击, 启用
+return
 
 ;自动连射开关
 AutoLiu:
     Menu, Tray, ToggleCheck, 无限溜溜球|F5开关
     vAutoLiu := !vAutoLiu
-LiuMode := vzpgLiu ? "装配工模式" : "固线模式" 
+LiuMode := vzpgLiu ? "装配工模式" : "固线模式"
     Speak(vAutoLiu ? "已开启无限溜溜球 " LiuMode : "已关闭无限溜溜球" LiuMode)
 
     if(vAutoLiu){
         Menu , tray, enable, 溜溜球模式
+        Menu , tray, enable, 固线自动重置
+
     }
     else{
         Menu , tray, Disable, 溜溜球模式
+        Menu , tray, Disable, 固线自动重置
+
     }
-    iniwrite, % vAutoLiu, TheDivision2.ini, 无限溜溜球, 启用
-Return
-; ======================
+    IniWrite, % vAutoLiu, TheDivision2.ini, 无限溜溜球, 启用
+return
+;#####################
+;#====溜溜球相关菜单====#
+;#####################
 ;左键装配工模式
 zpgLiu:
-    Menu, MySubmenu2, Check, 装配工模式
-    Menu, MySubmenu2, UnCheck, 固线模式
+    Menu, MySubMenu2, Check, 装配工模式
+    Menu, MySubMenu2, UnCheck, 固线模式
+    Menu , tray, Disable, 固线自动重置
     vzpgLiu := 1
     vgxLiu := 0
-LiuMode := vzpgLiu ? "装配工模式" : "固线模式" 
+LiuMode := vzpgLiu ? "装配工模式" : "固线模式"
     Speak(vAutoLiu ? "已开启无限溜溜球 " LiuMode : "已关闭无限溜溜球" LiuMode)
 
-    iniwrite, % vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式
-    iniwrite, % vgxLiu, TheDivision2.ini, 无限溜溜球, 固线模式
+    IniWrite, % vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式
+    IniWrite, % vgxLiu, TheDivision2.ini, 无限溜溜球, 固线模式
 return
 
 ;左键固线模式
 gxLiu:
-    Menu, MySubmenu2, Check, 固线模式
-    Menu, MySubmenu2, UnCheck, 装配工模式
+    Menu, MySubMenu2, Check, 固线模式
+    Menu, MySubMenu2, UnCheck, 装配工模式
+    Menu , tray, enable, 固线自动重置
     vgxLiu := 1
     vzpgLiu := 0
 
-LiuMode := vzpgLiu ? "装配工模式" : "固线模式" 
+LiuMode := vzpgLiu ? "装配工模式" : "固线模式"
     Speak(vAutoLiu ? "已开启无限溜溜球 " LiuMode : "已关闭无限溜溜球" LiuMode)
 
-    iniwrite, % vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式
-    iniwrite, % vgxLiu, TheDivision2.ini, 无限溜溜球, 固线模式
+    IniWrite, % vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式
+    IniWrite, % vgxLiu, TheDivision2.ini, 无限溜溜球, 固线模式
 return
 
 ;自动固线重置
 AutoGxLiu:
     Menu, Tray, ToggleCheck, 固线自动重置
     vAutoGxLiu := !vAutoGxLiu
-    ; LiuMode := vAutoGxLiu ? "装配工模式" : "固线模式" 
+    ; LiuMode := vAutoGxLiu ? "装配工模式" : "固线模式"
     ; Speak(vAutoLiu ? "已开启无限溜溜球 " LiuMode : "已关闭无限溜溜球" LiuMode)
 
     if (vAutoGxLiu) {
@@ -658,14 +780,14 @@ AutoGxLiu:
     else{
         Menu,Tray,uncheck,固线自动重置
     }
-    iniwrite, % vAutoGxLiu, TheDivision2.ini, 无限溜溜球,技能使用后自动重置固线
+    IniWrite, % vAutoGxLiu, TheDivision2.ini, 无限溜溜球,技能使用后自动重置固线
 return
 
 fastFire(speedIndex)
 {
     while (speedIndex > 0 and GetKeyState("LButton", "P") and GetKeyState("RButton", "P"))
     {
-        SendKey(keyName)
+        sendplay keyname
         Sleep speedArray[speedIndex]
     }
 }
@@ -673,23 +795,25 @@ fastFire(speedIndex)
 ;#####################
 ;#====基础函数====#
 ;#####################
-ToolTip(Text)
+ShowToolTip(Text)
 {
-    ToolTip , %Text%
-    SetTimer , RemoveToolTip, 3000
+    ToolTip, %Text%
+    SetTimer, RemoveToolTip, 3000
 return
-
 RemoveToolTip:
     SetTimer, RemoveToolTip, Off
     ToolTip
 return
 }
 
-SendKey(Key, Delay := 60)
+SendKey(Key,delay := 60)
 {
-    Send {%key% Down }
-    Sleep Delay
-    Send {%key% Up }
+    Random, fixDelay, 1, 60
+
+    delay +=fixdelay
+    SendInput {%key% Down}
+    Sleep delay
+    SendInput {%key% Up }
 }
 
 Sleep3(value) {
@@ -711,16 +835,16 @@ return
 
 ReloadScript:
     Reload
-Return
+return
 
 PauseScript:
     Pause, Toggle, 1
-Return
+return
 
 Version:
-
+    ;ShowToolTip("1.5")
 return
 
 ExitScript:
 ExitApp
-Return
+return
