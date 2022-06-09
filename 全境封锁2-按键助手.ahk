@@ -18,10 +18,12 @@ CoordMode , Mouse, Screen
 SetWorkingDir %A_ScriptDir%
 
 SetMouseDelay, 0,30, Play
-SetKeyDelay, 0, 60, Play
+SetKeyDelay, 0, 30, Play
 ;#####################
 ;#====读取ini&初始化====#
 ;#####################
+global ver := "2.1"
+
 global _downVal := 2
 global _RightVal := 0
 global _shotdelay := 0
@@ -47,6 +49,7 @@ IniRead , speedIndex, TheDivision2.ini, 简单模式, 单发间隔, 1
 IniRead , _autofire, TheDivision2.ini, 自动射击, 启用, 0
 IniRead , vFastShoot, TheDivision2.ini, 自动射击, 简单模式, 1
 IniRead , vDiyShoot, TheDivision2.ini, 自动射击, 高级模式, 0
+IniRead , vAutoShoot, TheDivision2.ini, 自动射击, 发现敌人自动射击, 0
 
 IniRead , vAutoLiu, TheDivision2.ini, 无限溜溜球, 启用, 0
 IniRead , vzpgLiu, TheDivision2.ini, 无限溜溜球, 装配工模式, 1	;1-装配工,2固线
@@ -61,7 +64,7 @@ IniRead , vAutoGxLiu, TheDivision2.ini, 无限溜溜球,技能使用后自动重
 
 ; global _downVal = 2
 ; global _rightVal = 0
-global _rampdown = 1
+; global _rampdown = 1
 ; global _shotdelay=0
 global _Readytofire = 1	;射击等待
 global _timerRunning = 0
@@ -70,7 +73,7 @@ global crosshairY =
 
 ;简单连击
 global speedArray := [25, 50, 75, 120]	; 连击间隔时间，单位毫秒，多个速率请使用这种格式：[80, 160, 320]
-; global speedIndex := 1
+global speedIndex := 1
 
 global keyName := "LButton"
 
@@ -84,7 +87,7 @@ global keyName := "LButton"
 global skinBoxEnable := 0
 ; global vAutoBox :=0
 ;常规指令
-global ver := "2.0"
+
 global voiceObject := ComObjCreate("SAPI.SpVoice")
 ;voiceObject.Rate := 4
 voiceObject.Volume := 100
@@ -144,12 +147,23 @@ if (vFastShoot) {
     Menu , MySubMenu1, check, 高级模式
 }
 Menu , Tray, Add, 连射模式, :MySubMenu1
+Menu , tray, add,发现敌人自动射击 , AutoShoot
+
 if (_autofire) {
     Menu , tray, check, 自动连射|F4开关
 }
 else{
     Menu , tray, Disable, 连射模式
+    Menu , tray, Disable, 发现敌人自动射击
 }
+
+if (vAutoShoot) {
+    Menu , tray, check, 发现敌人自动射击
+}
+else{
+    Menu , tray, uncheck,发现敌人自动射击
+}
+
 Menu , tray, add,武器发射设置额外按键为J , MenuHandler
 Menu , tray, Disable, 武器发射设置额外按键为J
 
@@ -353,22 +367,24 @@ return
 
 ; 按住鼠标右键再按左键连击，其他情况不连击
 #If speedIndex > 0 AND _autofire AND vFastShoot and WinActive("ahk_exe TheDivision2.exe")
+    ~RButton & LButton::fastFire()
 
 #If WinActive("ahk_exe TheDivision2.exe") and vAutoLiu AND vzpgLiu
-XButton1 UP::
-SendPlay {q Down}
+XButton1::
+send {q Down}
 sleep 800
-loop,20{
-    SendPlay {5}
-    sleep 50
+loop,10{
+    Random, keydelay, 10, 50
+    SendKey("5")
+    sleep keydelay
 }
-sleep 1500
-SendPlay {q Up}
+sleep 300
+send {q Up}
 return
 
 #If WinActive("ahk_exe TheDivision2.exe") and vAutoLiu AND vgxLiu
     XButton1::
-    vdelay:=85
+    Random, vdelay, 80, 120
     SendPlay {b}
     Sleep vdelay
     SendPlay {Down}
@@ -377,6 +393,8 @@ return
     Sleep vdelay
     SendPlay {Space}
     Sleep vdelay
+
+    Random, vdelay, 80, 120
     SendPlay {Down}
     Sleep vdelay
     SendPlay {Space}
@@ -385,6 +403,8 @@ return
     Sleep vdelay
     SendPlay {Space}
     Sleep vdelay
+
+    Random, vdelay, 80, 120
     SendPlay {Esc}
     Sleep vdelay
     SendPlay {b}
@@ -403,7 +423,7 @@ return
     or A_ThisHotkey="~E" and A_PriorHotkey = "~E" and A_TimeSincePriorHotkey <= 600 ;双击E释放
     or A_ThisHotkey="~E" and A_TimeSinceThisHotkey >= 400 )
     {
-        Sleep 1500
+        Sleep 800
         send,{XButton1}
     }
 
@@ -473,92 +493,124 @@ return
 return
 
 ~o::	; Single shot timer up (zero is always fire)
-    _shotdelay := _shotdelay + 25
+    _shotdelay := _shotdelay + 10
     ; ToolTip("Single Shot Delay up= " _shotdelay)
     Speak("单发射击延迟为" _shotdelay)
 
     IniWrite, % _shotdelay, TheDivision2.ini, 高级模式, 单发间隔
 return
 
-#If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire
-    ~LButton:: lessrecoil()
-~RButton:: lessrecoil_triggerbot()	;"RButton" is mouse 2.  If you change this, make sure you replace every RButton in the script.
-;~Joy10:: lessrecoil_triggerbot_xbox()
+~^o:: ; Single shot timer down (zero is always fire)
+    if _shotdelay > 0
+    {
+        _shotdelay := _shotdelay - 10
+        _shotdelay<0?_shotdelay:=0:
+            Speak("单发射击延迟为" _shotdelay)
 
-~RButton Up::
-    loop,4{
-        Sleep 200
-        Send , { j up}
+            IniWrite, % _shotdelay, TheDivision2.ini, 高级模式, 单发间隔
+        }
+        return
+
+        #If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire
+            ~LButton:: lessrecoil()
+        #If
+
+        lessrecoil()
+        {
+            while GetKeyState("LButton", "P")
+            {
+                ApplyReduction()
+            }
+        return
     }
-RETURN
-#If
+
+    #If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire and not vAutoShoot
+        ~RButton & LButton:: lessrecoil_noCheck()
+    #If
+
+    lessrecoil_noCheck()
+    {
+        while GetKeyState("LButton", "P")
+        {
+            TryToFire()
+            ApplyReduction()
+        }
+        SendInput , { j up }
+        Sleep3(10)
+        _timerRunning = 0
+        _Readytofire = 1
+        return
+    }
+
+    #If WinActive("ahk_exe TheDivision2.exe") AND vDiyShoot and _autofire and vAutoShoot
+        ~RButton:: lessrecoil_triggerbot()	;"RButton" is mouse 2.  If you change this, make sure you replace every RButton in the script.
+    ;~Joy10:: lessrecoil_triggerbot_xbox()
+    ; ~RButton Up::
+    ;     loop,4{
+    ;         Sleep 200
+    ;         Sendinput , { j up}
+    ;     }
+    ; RETURN
+    #If
+
     ;####################
-;======Functions======
-;####################
-lessrecoil()
-{
-    while GetKeyState("LButton", "P")
-    {
-        Sleep 10
-        ApplyReduction()
-        Sleep 10
-    }
-return
-}
-;==================
-lessrecoil_triggerbot()
-{
-    while GetKeyState("RButton", "P")
-    {
+    ;======Functions======
+    ;####################
 
-        if CrosshairCheck()
+    ;==================
+    lessrecoil_triggerbot()
+    {
+        while GetKeyState("RButton", "P")
         {
-            TryToFire()
-            ApplyReduction()
-        }
 
+            if CrosshairCheck()
+            {
+                TryToFire()
+                ApplyReduction()
+            }
+
+        }
+        SendInput , { j up }
+        Sleep3(10)
+        _timerRunning = 0
+        _Readytofire = 1
+        return
     }
-    SendInput , { j up }
-    Sleep3(10)
-    _timerRunning = 0
-    _Readytofire = 1
-return
-}
-;==================
-lessrecoil_triggerbot_xbox()
-{
-    while GetKeyState("Joy10")
+    ;==================
+    lessrecoil_triggerbot_xbox()
+    {
+        while GetKeyState("Joy10")
+        {
+
+            if CrosshairCheck()
+            {
+                TryToFire()
+                ApplyReduction()
+            }
+
+        }
+        Send , { j up }
+        Sleep3(5)
+        _timerRunning = 0
+        _Readytofire = 1
+        return
+    }
+    ;==================
+    ApplyReduction()
     {
 
-        if CrosshairCheck()
-        {
-            TryToFire()
-            ApplyReduction()
-        }
-
+        DllCall("Mouse_event", uint, 1, int, _RightVal, int, _downVal, uint, 0, int, 0)
+        ; Sleep3(5)
+        ; DllCall("mouse_event",uint,1,int,_rightVal,int,_downVal,uint,0,int,0)
+        ; Sleep 20
+        ; DllCall("mouse_event",uint,1,int,_rightVal,int,_downVal,uint,0,int,0)
+        ; Sleep 20
+        return
     }
-    Send , { j up }
-    Sleep3(5)
-    _timerRunning = 0
-    _Readytofire = 1
-return
-}
-;==================
-ApplyReduction()
-{
-
-    DllCall("Mouse_event", uint, 1, int, _RightVal, int, _downVal, uint, 0, int, 0)
-    Sleep 20
-    ; DllCall("mouse_event",uint,1,int,_rightVal,int,_downVal,uint,0,int,0)
-    ; Sleep 20
-    ; DllCall("mouse_event",uint,1,int,_rightVal,int,_downVal,uint,0,int,0)
-    ; Sleep 20
-return
-}
-;==================
-CrosshairCheck()	; returns as "true" if either autofire, or crosshair is found.
-{
-    if _autofire = 0
+    ;==================
+    CrosshairCheck()	; returns as "true" if either autofire, or crosshair is found.
+    {
+        if _autofire = 0
         return false
     else
     {
@@ -574,7 +626,7 @@ CrosshairCheck()	; returns as "true" if either autofire, or crosshair is found.
     {
         return true
     } else {
-        Send , {j up}
+        SendInput , {j up}
         Sleep 20
         return false
     }
@@ -591,28 +643,28 @@ TryToFire()
         if _Readytofire = 1
         {
             SendInput , { j up }
-            Sleep 10
+            Sleep3(5)
             SendInput , { j down }
             _Readytofire = 0
             ShotTimer()
-            return
-        } else
-        {
-            ShotTimer()
-            return
-
-        }
+        return
+    } else
+    {
         ShotTimer()
-        if _shotdelay > 0
-        {
-            SendInput , { j up }
-            ShotTimer()
-            Sleep 10
-        } else
-        {
-            _Readytofire = 1
-        }
+        return
+
     }
+    ShotTimer()
+    if _shotdelay > 0
+    {
+        SendInput , { j up }
+        ShotTimer()
+        Sleep3(5)
+    } else
+    {
+        _Readytofire = 1
+    }
+}
 }
 ;==================
 ShotTimer()
@@ -624,12 +676,12 @@ ShotTimer()
         _timerRunning = 1
         return
     } else
-return
-ShotWait:
-    SetTimer, ShotWait, Off
-    _timerRunning = 0
-    _Readytofire = 1
-return
+    return
+    ShotWait:
+        SetTimer, ShotWait, Off
+        _timerRunning = 0
+        _Readytofire = 1
+    return
 }
 ;#####################
 ;#====游戏启动相关菜单====#
@@ -676,6 +728,16 @@ AutoBox:
     IniWrite, % vAutoBox, TheDivision2.ini, 服装箱子, 启用
 
 return
+
+fastFire()
+{
+    while (speedIndex > 0 and GetKeyState("LButton", "P") and GetKeyState("RButton", "P"))
+    {
+        sendplay keyname
+        Sleep speedArray[speedIndex]
+    }
+}
+
 ;#####################
 ;#====自动射击相关菜单====#
 ;#####################
@@ -683,6 +745,8 @@ return
 FastShoot:
     Menu, MySubMenu1, Check, 简单模式
     Menu, MySubMenu1, UnCheck, 高级模式
+    Menu , tray, Disable,发现敌人自动射击
+
     vFastShoot := 1
     vDiyShoot := 0
     IniWrite, % vFastShoot, TheDivision2.ini, 自动射击, 简单模式
@@ -693,6 +757,8 @@ return
 DiyShoot:
     Menu, MySubMenu1, Check, 高级模式
     Menu, MySubMenu1, UnCheck, 简单模式
+    Menu , tray, Enable,发现敌人自动射击
+
     vDiyShoot := 1
     vFastShoot := 0
 
@@ -709,14 +775,24 @@ fireMode := vFastShoot ? "简单模式" : "高级模式"
 
     if(_autofire){
         Menu , tray, enable, 连射模式
+        Menu , tray, Enable,发现敌人自动射击
     }
     else{
         Menu , tray, Disable, 连射模式
+        Menu , tray, Disable,发现敌人自动射击
     }
     IniWrite, % _autofire, TheDivision2.ini, 自动射击, 启用
 return
 
-;自动连射开关
+AutoShoot:
+    Menu , tray, ToggleCheck,发现敌人自动射击
+
+    vAutoShoot := !vAutoShoot
+
+    IniWrite, % vAutoShoot, TheDivision2.ini, 自动射击, 发现敌人自动射击
+return
+
+;自动溜溜球开关
 AutoLiu:
     Menu, Tray, ToggleCheck, 无限溜溜球|F5开关
     vAutoLiu := !vAutoLiu
@@ -783,15 +859,6 @@ AutoGxLiu:
     IniWrite, % vAutoGxLiu, TheDivision2.ini, 无限溜溜球,技能使用后自动重置固线
 return
 
-fastFire(speedIndex)
-{
-    while (speedIndex > 0 and GetKeyState("LButton", "P") and GetKeyState("RButton", "P"))
-    {
-        sendplay keyname
-        Sleep speedArray[speedIndex]
-    }
-}
-
 ;#####################
 ;#====基础函数====#
 ;#####################
@@ -806,14 +873,14 @@ RemoveToolTip:
 return
 }
 
-SendKey(Key,delay := 60)
+SendKey(Key,delay := 30)
 {
-    Random, fixDelay, 1, 60
+    Random, fixDelay, 20, 60
 
     delay +=fixdelay
-    SendInput {%key% Down}
+    Send {%key% Down}
     Sleep delay
-    SendInput {%key% Up }
+    Send {%key% Up }
 }
 
 Sleep3(value) {
