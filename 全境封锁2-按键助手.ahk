@@ -10,14 +10,13 @@
 #MaxThreads 30
 #MaxThreadsBuffer off
 ; #Include BTT.ahk
-; SendMode InputThenPlay
+SendMode InputThenPlay
 ListLines , Off
 CurPID := DllCall("GetCurrentProcessId")
 Process , Priority, %CurPID%, High
 CoordMode , Pixel, Screen
 CoordMode , Mouse, Screen
 SetWorkingDir %A_ScriptDir%
-
 ;#####################
 ;#====读取ini&初始化====#
 ;#####################
@@ -56,7 +55,7 @@ IniRead , vSetUPC, TheDivision2.ini, 游戏启动, 降低UPC, 1
 IniRead , vSetEN, TheDivision2.ini, 游戏启动, 英文模式, 1
 
 IniRead , vOneKeyZL, TheDivision2.ini, 一键政令, 启用, 1
-IniRead , resetArea, TheDivision2.ini, 一键政令, 重置控制点, 1
+IniRead , vResetArea, TheDivision2.ini, 一键政令, 重置控制点, 1
 
 IniRead , vAutoBox, TheDivision2.ini, 服装箱子, 启用, 0
 
@@ -154,8 +153,8 @@ if (vOneKeyZL) {
     Menu , tray, check, 一键政令|ALT+1
 }
 
-Menu , tray, add, 一键政令时重置控制点, ResetControlArea
-if (resetArea) {
+Menu , tray, add, 一键政令时重置控制点, ResetArea
+if (vResetArea) {
     Menu , tray, check, 一键政令时重置控制点
 }
 
@@ -371,41 +370,41 @@ return cmdInfo
 ; 打开或关闭 5 政令，默认是 Alt+1
 #If (WinActive("ahk_exe TheDivision2.exe") or debug) AND vOneKeyZL
 !1::
-vDelay:=150
-SendPlay {m}
-Sleep %vDelay%
-SendPlay {z}
-Sleep %vDelay%
-SendPlay {Down}
-Sleep %vDelay%
-SendPlay {Space}
-Sleep %vDelay%
+vDelay:=80
+SendKey("m")
+Sleep vDelay
+SendKey("z")
+Sleep vDelay
+SendKey("Down")
+Sleep vDelay
+SendKey("Space")
+Sleep vDelay
 
 loop, 4
 {
-    SendPlay {Space}
-    Sleep %vDelay%
-    SendPlay {Down}
-    Sleep %vDelay%
+    SendKey("Space")
+    Sleep vDelay
+    SendKey("Down")
+    Sleep vDelay
 }
 
-SendPlay {Space}
-Sleep %vDelay%
-SendPlay {Esc}
-Sleep %vDelay%
+SendKey("Space")
+Sleep vDelay
+SendKey("Esc")
+Sleep vDelay
 ;根据选项决定是否重置控制点
-if (resetArea = 1)
+if (vResetArea = 1)
 {
-    SendPlay {Down}
-    Sleep %vDelay%
-    SendPlay {Space}
-    Sleep %vDelay%
+    SendKey("Down")
+    Sleep vDelay
+    SendKey("Space")
+    Sleep vDelay
 }
-SendPlay {f}
+SendKey("f")
 Sleep 300
-SendPlay {Space}
-Sleep %vDelay%
-SendPlay {m}
+SendKey("Space",200)
+Sleep 300
+SendKey("m")
 return
 
 ; 启动自动打开服装箱，默认是 Alt+2
@@ -717,7 +716,7 @@ readWeapon(_chooseGun)
         IniWrite , % _weaponTextFix, TheDivision2.ini, 高级模式, 武器名修饰后缀
     }
 
-    Speak(_weaponText . _weaponTextFix)
+    ; Speak(_weaponText . _weaponTextFix)
 }
 
 ~NumpadAdd::	; Adds compensation.
@@ -969,10 +968,10 @@ OnekeyZL:
 return
 
 ;重置控制点
-ResetControlArea:
+ResetArea:
     Menu, Tray, ToggleCheck, 一键政令时重置控制点
-    resetArea := Not resetArea
-    IniWrite, % resetArea, TheDivision2.ini, 一键政令, 重置控制点
+    vResetArea := Not vResetArea
+    IniWrite, % vResetArea, TheDivision2.ini, 一键政令, 重置控制点
 return
 
 ;自动开服装箱
@@ -1155,13 +1154,13 @@ RemoveToolTip:
 return
 }
 
-SendKey(Key,delay := 30)
+SendKey(Key,DelayTime := 30)
 {
-    Random, fixDelay, 20, 60
+    Random, fixDelay, 20, 50
 
-    delay +=fixdelay
+    DelayTime +=fixdelay
     Send {%key% Down}
-    Sleep Delay
+    Sleep DelayTime
     Send {%key% Up}
 }
 
