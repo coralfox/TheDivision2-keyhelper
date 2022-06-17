@@ -1203,7 +1203,7 @@ Help:
 return
 
 Version:
-    ;ShowToolTip("1.5")
+    run,https://github.com/coralfox/TheDivision2-keyhelper/tree/%E6%8C%89%E9%94%AE%E5%8A%A9%E6%89%8B
 return
 
 ExitScript:

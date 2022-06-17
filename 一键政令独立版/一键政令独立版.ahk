@@ -14,10 +14,7 @@ SetWorkingDir %A_ScriptDir%
 PID := DllCall("GetCurrentProcessId")
 Process, Priority, %PID%, High
 
-global voiceObject := ComObjCreate("SAPI.SpVoice")
-;voiceObject.Rate := 4
-voiceObject.Volume := 100
-global delay :=100
+global ver := "1.0"
 
 if FileExist("ZLsettings.ini")
 {
@@ -32,7 +29,7 @@ Else
   iniWrite , 1, ZLsettings.ini, 一键政令, 启用
   iniWrite, 150, ZLsettings.ini, 一键政令, 延迟
   iniWrite , 1, ZLsettings.ini, 一键政令, 重置控制点
-  iniWrite , 1, ZLsettings.ini, 一键政令, 切换难
+  iniWrite , 1, ZLsettings.ini, 一键政令, 切换难度
 }
 ;#####################
 ;#====菜单相关====#
@@ -218,11 +215,11 @@ Menu,tray,add,退出 | Exit,ExitScript
   return
 
   Help:
-    run,https://coralfox.notion.site/2-4e842f64f12f4e34bf827f29c30a6942
+    run,https://coralfox.notion.site/2-ca1b7772d1ac4043ac1a5fc0e4fb83fe
   return
 
   Version:
-    ;ShowToolTip("1.5")
+    run,https://github.com/coralfox/TheDivision2-keyhelper/releases/tag/%E4%B8%80%E9%94%AE%E6%94%BF%E4%BB%A4
   return
 
   ExitScript:
