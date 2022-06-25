@@ -486,9 +486,10 @@ return
             Speak("启动自动打开服装箱")
 
         SetTimer, openBOX, 15000
+        Gosub, openBOX
     }
     else{
-        SetTimer, openBOX, delete
+        SetTimer, openBOX, off
         SendKey("x")
 
         btt(,,,3)
@@ -513,7 +514,7 @@ openBOX:
 
     if (ok:=FindText(X, Y,, , , , 0, 0, Text))
     {
-        SetTimer, openBOX, delete
+        SetTimer, openBOX, off
         skinBoxEnable := !skinBoxEnable
 
         btt(,,,3)
@@ -760,19 +761,21 @@ return
 #If
 
 #If (WinActive("ahk_exe TheDivision2.exe") or debug) and vAutoJuTa 
-!e::
-XButton1::
+!e up::
+XButton1 Up::
     loopJuTaEnable := !loopJuTaEnable
 
     if(loopJuTaEnable)
     {
-        SetTimer, loopJuTa, 3000
 
         if vTtsSpeak
             Speak("狙击塔 battle control online")
+
+        SetTimer, loopJuTa, 4000
+        gosub loopJuTa
     }
     else{
-        SetTimer, loopJuTa, delete
+        SetTimer, loopJuTa, off
 
         if vTtsSpeak
             Speak("狙击塔已下线")
@@ -780,19 +783,20 @@ XButton1::
 return
 
 loopJuTa:
-    Random, vRanDelay, 80, 180 
+    ; Random, vRanDelay, 50, 180 
     ; sleep vRanDelay6
-    SendPlay {6}
-    sleep 800
-    loop 4{
-        sleep vRanDelay
-        SendPlay {e}
+    SendKey("6",500)
+    sleep 600
+    loop 5{
+        sleep 120
+        SendKey("e")
     }
-    ; sleep 50
-    SendPlay {6 down}
-    sleep 500
-    SendPlay {6 up}
-    ; sleep 1200
+    sleep 600
+    SendKey("6",500)
+    ; SendPlay {6 down}
+    ; sleep 500
+    ; SendPlay {6 up}
+    sleep 1200
 return
 
 ; #IfWinActive ahk_exe TheDivision2.exe
